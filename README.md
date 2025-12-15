@@ -19,11 +19,14 @@ make install
 - jq (`apt install jq`)
 - Открытый порт 443
 
-### Быстрая установка Docker (Ubuntu/Debian)
+### Быстрая установка зависимостей (Ubuntu/Debian)
 
 ```bash
+# Docker
 curl -fsSL https://get.docker.com | sh
-apt install -y jq
+
+# Make, jq, openssl
+apt install -y make jq openssl
 ```
 
 ---
