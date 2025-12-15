@@ -22,10 +22,29 @@ make install
 ### Быстрая установка зависимостей (Ubuntu/Debian)
 
 ```bash
-# Docker
+# Docker (Ubuntu 22.04+, Debian 12+)
 curl -fsSL https://get.docker.com | sh
 
 # Make, jq, openssl
+apt install -y make jq openssl
+```
+
+### Ubuntu 20.04 (Focal) — ручная установка Docker
+
+```bash
+# Добавляем репозиторий Docker
+apt-get update
+apt-get install -y ca-certificates curl
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu focal stable" > /etc/apt/sources.list.d/docker.list
+apt-get update
+
+# Устанавливаем Docker (без docker-model-plugin)
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Остальные зависимости
 apt install -y make jq openssl
 ```
 
