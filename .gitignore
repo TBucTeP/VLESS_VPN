@@ -1,0 +1,23 @@
+# Environment
+.env
+
+# Generated configs (содержат приватные ключи)
+config/
+output/
+logs/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Temp
+*.tmp
+*.bak
