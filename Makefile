@@ -111,6 +111,9 @@ status:
 	@echo -e "$(C_YELLOW)Порт 443:$(C_NC)"
 	@ss -ltnp 2>/dev/null | grep ':443' || netstat -tlnp 2>/dev/null | grep ':443' || echo "  Не найден"
 
+diagnostics:
+	@bash $(SCRIPTS)/diagnostics.sh
+
 # ════════════════════════════════════════════════════════════════════
 # CLIENTS
 # ════════════════════════════════════════════════════════════════════
