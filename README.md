@@ -158,16 +158,16 @@ CLIENTS_COUNT=10
 1. Открой Shadowrocket → **+** → **Add Server**
 2. Выбери тип: **VLESS**
 3. Заполни:
-   - **Address**: `45.12.129.124` (IP сервера)
-   - **Port**: `443`
-   - **UUID**: `c1a109e7-0d88-49ce-9c8d-0682cbba5d2d` (из ссылки)
+   - **Address**: `<YOUR_SERVER_IP>` (IP сервера из `make list`)
+   - **Port**: `443` (или другой из .env)
+   - **UUID**: `<UUID_FROM_LINK>` (из ссылки `make list`)
    - **Encryption**: `none`
    - **Flow**: `xtls-rprx-vision`
    - **Network**: `TCP`
    - **Security**: `REALITY`
-   - **SNI**: `www.microsoft.com`
-   - **Public Key**: `CN1rl74Ke_3dBuD1NWxPqb55gUlnScxdrEAH3FGluF8` (pbk из ссылки)
-   - **Short ID**: `512d16efe5a53dae` (sid из ссылки)
+   - **SNI**: `www.microsoft.com` (или другой из .env)
+   - **Public Key**: `<PBK_FROM_LINK>` (pbk из ссылки `make list`)
+   - **Short ID**: `<SID_FROM_LINK>` (sid из ссылки `make list`)
    - **Fingerprint**: `chrome`
 4. Нажми **Save**
 5. Включи переключатель
@@ -185,9 +185,9 @@ CLIENTS_COUNT=10
 5. Если не работает — попробуй:
    - **Manual** → выбери **VLESS**
    - Введи данные вручную:
-     - Address: IP сервера
-     - Port: 443
-     - UUID: из ссылки
+     - Address: IP сервера (из `make list`)
+     - Port: 443 (или другой из .env)
+     - UUID: из ссылки (`make list`)
      - Flow: `xtls-rprx-vision`
      - Encryption: `none`
      - Network: `tcp`
