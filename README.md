@@ -137,9 +137,39 @@ CLIENTS_COUNT=10
 
 ### Как подключиться
 
+#### V2Box (iOS)
+
+1. Скопируй ссылку из `make list` (полностью, от `vless://` до конца)
+2. Открой V2Box
+3. Нажми **+** (добавить)
+4. Выбери **Import from Clipboard** или **Scan QR Code**
+5. Если не работает — попробуй:
+   - **Manual** → выбери **VLESS**
+   - Введи данные вручную:
+     - Address: IP сервера
+     - Port: 443
+     - UUID: из ссылки
+     - Flow: `xtls-rprx-vision`
+     - Encryption: `none`
+     - Network: `tcp`
+     - Security: `reality`
+     - SNI: `www.microsoft.com`
+     - Public Key (pbk): из ссылки
+     - Short ID (sid): из ссылки
+     - Fingerprint: `chrome`
+
+#### v2rayNG (Android)
+
 1. Скопируй ссылку из `make list`
-2. В приложении: **Import** → **From Clipboard** или **Scan QR**
-3. Подключись
+2. Открой v2rayNG
+3. Нажми **+** → **Import from Clipboard**
+4. Или **Scan QR Code**
+
+#### Общие проблемы
+
+- **Timeout**: Проверь что порт 443 открыт извне (`make diagnostics`)
+- **Не подключается**: Убедись что ссылка скопирована полностью
+- **Ошибка ключей**: Перегенерируй конфиг (`rm -rf config output && make install`)
 
 ---
 
