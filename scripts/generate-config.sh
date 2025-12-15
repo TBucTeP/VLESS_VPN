@@ -71,9 +71,16 @@ if [ -z "$PRIV" ]; then
     exit 1
 fi
 
-# Получаем Public Key
+# Получаем Public Key (в новых версиях Xray он называется "Password")
 PUB_OUTPUT=$("$XRAY_BIN" x25519 -i "$PRIV" 2>&1)
+
+# Пробуем PublicKey (старые версии)
 PUB=$(echo "$PUB_OUTPUT" | grep -i "public" | sed 's/.*: *//' | tr -d ' \t\r\n')
+
+# Пробуем Password (новые версии Xray - это и есть PublicKey)
+if [ -z "$PUB" ]; then
+    PUB=$(echo "$PUB_OUTPUT" | grep -i "password" | sed 's/.*: *//' | tr -d ' \t\r\n')
+fi
 
 # Fallback: ищем любой base64url токен
 if [ -z "$PUB" ]; then
