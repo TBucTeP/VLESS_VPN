@@ -18,7 +18,7 @@ C_NC     := \033[0m
 SCRIPTS := scripts
 COMPOSE := docker compose
 
-.PHONY: help install init up down restart logs status \
+.PHONY: help install init up down restart logs status diagnostics \
         add remove list rotate-keys change-sni change-sid clean
 
 # ════════════════════════════════════════════════════════════════════
@@ -39,6 +39,7 @@ help:
 	@echo "   make restart     - Перезапустить"
 	@echo "   make logs        - Логи Xray"
 	@echo "   make status      - Статус"
+	@echo "   make diagnostics - Полная диагностика"
 	@echo ""
 	@echo -e "$(C_YELLOW)👥 Клиенты:$(C_NC)"
 	@echo "   make add         - Добавить клиента"
