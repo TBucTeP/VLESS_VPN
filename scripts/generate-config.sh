@@ -124,9 +124,7 @@ echo "📝 Создание конфига..."
 cat > "${CONFIG_DIR}/config.json" <<EOF
 {
   "log": {
-    "loglevel": "warning",
-    "access": "/var/log/xray/access.log",
-    "error": "/var/log/xray/error.log"
+    "loglevel": "warning"
   },
   "inbounds": [
     {
