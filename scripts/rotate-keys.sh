@@ -43,17 +43,16 @@ fi
 # Получаем публичный ключ (в новых версиях Xray он называется "Password")
 PUB_OUTPUT=$(docker exec xray-vless xray x25519 -i "$PRIV" 2>&1)
 
-# Пробуем PublicKey (старые версии)
-PUB=$(echo "$PUB_OUTPUT" | grep -i "public" | sed 's/.*: *//' | tr -d ' \t\r\n')
+# Пробуем PublicKey (старые версии) или Password (новые версии)
+PUB=$(echo "$PUB_OUTPUT" | grep -i "public" | sed 's/.*: *//' | tr -d ' \t\r\n' || true)
 
-# Пробуем Password (новые версии)
 if [ -z "$PUB" ]; then
-    PUB=$(echo "$PUB_OUTPUT" | grep -i "password" | sed 's/.*: *//' | tr -d ' \t\r\n')
+    PUB=$(echo "$PUB_OUTPUT" | grep -i "password" | sed 's/.*: *//' | tr -d ' \t\r\n' || true)
 fi
 
 # Fallback
 if [ -z "$PUB" ]; then
-    PUB=$(echo "$PUB_OUTPUT" | grep -Eo '[A-Za-z0-9_-]{43,44}' | grep -v "^${PRIV}$" | head -1)
+    PUB=$(echo "$PUB_OUTPUT" | grep -Eo '[A-Za-z0-9_-]{43,44}' | grep -v "^${PRIV}$" | head -1 || true)
 fi
 
 if [ -z "$PUB" ]; then
