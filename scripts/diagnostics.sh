@@ -83,17 +83,48 @@ else
 fi
 echo ""
 
-# 8. Проверка извне (если есть публичный IP)
+# 8. Проверка доступности порта 443 извне
 if [ -n "$PUBIP" ] && [ "$PUBIP" != "<не определён>" ]; then
     echo "8️⃣  Проверка доступности порта 443 извне:"
-    echo "   Запусти на другом компьютере:"
+    echo "   IP: ${PUBIP}"
+    echo ""
+    echo "   Проверь с другого компьютера:"
     echo "   nc -zv ${PUBIP} 443"
-    echo "   или"
-    echo "   telnet ${PUBIP} 443"
+    echo ""
+    echo "   Или используй онлайн-чекер:"
+    echo "   https://www.yougetsignal.com/tools/open-ports/"
+    echo "   https://canyouseeme.org/"
+    echo ""
+    echo "   ⚠️  Если порт закрыт - провайдер блокирует 443"
+    echo "   Решение: используй другой порт (8443, 4443, 4433)"
     echo ""
 fi
 
-# 9. Рекомендации
+# 9. Проверка ссылки
+if [ -f "$CONFIG_FILE" ]; then
+    echo "9️⃣  Проверка конфигурации ссылки:"
+    CONFIG_PBK=$(jq -r '.inbounds[0].streamSettings.realitySettings.privateKey' "$CONFIG_FILE" 2>/dev/null)
+    if [ -n "$CONFIG_PBK" ]; then
+        # Вычисляем публичный ключ из конфига
+        if docker exec xray-vless xray x25519 -i "$CONFIG_PBK" 2>&1 | grep -qi "password"; then
+            CONFIG_PUB=$(docker exec xray-vless xray x25519 -i "$CONFIG_PBK" 2>&1 | grep -i "password" | sed 's/.*: *//' | tr -d ' \t\r\n' || true)
+        else
+            CONFIG_PUB=$(docker exec xray-vless xray x25519 -i "$CONFIG_PBK" 2>&1 | grep -Eo '[A-Za-z0-9_-]{43,44}' | grep -v "^${CONFIG_PBK}$" | head -1 || true)
+        fi
+        CONFIG_SID=$(jq -r '.inbounds[0].streamSettings.realitySettings.shortIds[0]' "$CONFIG_FILE" 2>/dev/null)
+        CONFIG_SNI=$(jq -r '.inbounds[0].streamSettings.realitySettings.serverNames[0]' "$CONFIG_FILE" 2>/dev/null)
+        CONFIG_PORT=$(jq -r '.inbounds[0].port' "$CONFIG_FILE" 2>/dev/null)
+        
+        echo "   PublicKey (pbk): ${CONFIG_PUB:0:20}..."
+        echo "   ShortID (sid): ${CONFIG_SID}"
+        echo "   SNI: ${CONFIG_SNI}"
+        echo "   Port: ${CONFIG_PORT}"
+        echo ""
+        echo "   ⚠️  Убедись что эти значения совпадают в ссылке!"
+    fi
+fi
+
+# 10. Рекомендации
 echo "╔══════════════════════════════════════════════════════════════╗"
 echo "║                    💡 РЕКОМЕНДАЦИИ                             ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
