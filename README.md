@@ -25,8 +25,8 @@ make install
 # Docker (Ubuntu 22.04+, Debian 12+)
 curl -fsSL https://get.docker.com | sh
 
-# Make, jq, openssl
-apt install -y make jq openssl
+# Make, jq, openssl, unzip, curl
+apt install -y make jq openssl unzip curl
 ```
 
 ### Ubuntu 20.04 (Focal) — ручная установка Docker
@@ -45,7 +45,7 @@ apt-get update
 apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
 # Остальные зависимости
-apt install -y make jq openssl
+apt install -y make jq openssl unzip curl
 ```
 
 ---
