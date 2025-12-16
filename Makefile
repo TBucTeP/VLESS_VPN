@@ -206,15 +206,23 @@ wireguard-logs:
 
 wireguard-add:
 	@echo -e "$(C_BLUE)➕ Добавление нового WireGuard клиента...$(C_NC)"
-	@docker exec wireguard-vpn wg genkey | tee /tmp/peer_private.key | docker exec -i wireguard-vpn wg pubkey > /tmp/peer_public.key
-	@PEER_NUM=$$(($$(ls -1 config/wireguard/peer* 2>/dev/null | wc -l) + 1)); \
-	PEER_PRIV=$$(cat /tmp/peer_private.key); \
-	PEER_PUB=$$(cat /tmp/peer_public.key); \
-	SERVER_PUB=$$(docker exec wireguard-vpn cat /config/wg0.conf | grep -oP 'PublicKey = \K[^ ]+'); \
-	SERVER_IP=$$(docker exec wireguard-vpn cat /config/wg0.conf | grep -oP 'Address = \K[^/]+' | head -1); \
-	PEER_IP="10.66.66.$$((PEER_NUM + 1))"; \
-	mkdir -p "config/wireguard/peer$${PEER_NUM}"; \
-	cat > "config/wireguard/peer$${PEER_NUM}/peer$${PEER_NUM}.conf" <<EOF; \
+	@if ! docker ps | grep -q wireguard-vpn; then \
+		echo -e "$(C_RED)❌ WireGuard контейнер не запущен. Запусти: make wireguard-up$(C_NC)"; \
+		exit 1; \
+	fi
+	@PEER_NUM=$$(($$(ls -1d config/wireguard/peer* 2>/dev/null | wc -l) + 1)); \
+	docker exec wireguard-vpn addpeer $${PEER_NUM} >/dev/null 2>&1 || \
+	docker exec wireguard-vpn /config/wg-quick/peer$${PEER_NUM}/add_peer.sh >/dev/null 2>&1 || \
+	{ \
+		echo -e "$(C_YELLOW)⚠️  Используем ручной метод...$(C_NC)"; \
+		docker exec wireguard-vpn wg genkey | tee /tmp/peer_private.key | docker exec -i wireguard-vpn wg pubkey > /tmp/peer_public.key; \
+		PEER_PRIV=$$(cat /tmp/peer_private.key); \
+		PEER_PUB=$$(cat /tmp/peer_public.key); \
+		SERVER_PUB=$$(docker exec wireguard-vpn cat /config/wg0.conf 2>/dev/null | grep -oP 'PublicKey = \K[^ ]+' | head -1); \
+		SERVER_IP=$$(curl -fsSL -4 ifconfig.co 2>/dev/null || echo "<SERVER_IP>"); \
+		PEER_IP="10.66.66.$$((PEER_NUM + 1))"; \
+		mkdir -p "config/wireguard/peer$${PEER_NUM}"; \
+		cat > "config/wireguard/peer$${PEER_NUM}/peer$${PEER_NUM}.conf" <<EOF; \
 [Interface] \
 PrivateKey = $${PEER_PRIV} \
 Address = $${PEER_IP}/24 \
@@ -222,14 +230,20 @@ DNS = 1.1.1.1 \
  \
 [Peer] \
 PublicKey = $${SERVER_PUB} \
-Endpoint = $$(curl -fsSL -4 ifconfig.co 2>/dev/null || echo "<SERVER_IP>"):51820 \
+Endpoint = $${SERVER_IP}:51820 \
 AllowedIPs = 0.0.0.0/0, ::/0 \
 PersistentKeepalive = 25 \
 EOF
-	@docker exec wireguard-vpn wg set wg0 peer $$(cat /tmp/peer_public.key) allowed-ips $$(cat config/wireguard/peer$${PEER_NUM}/peer$${PEER_NUM}.conf | grep "Address = " | awk '{print $$3}')
-	@rm -f /tmp/peer_*.key
-	@echo -e "$(C_GREEN)✅ Клиент добавлен$(C_NC)"
-	@echo -e "$(C_CYAN)📄 Конфиг: config/wireguard/peer$${PEER_NUM}/peer$${PEER_NUM}.conf$(C_NC)"
+		docker exec wireguard-vpn wg set wg0 peer $${PEER_PUB} allowed-ips $${PEER_IP}/32; \
+		rm -f /tmp/peer_*.key; \
+	}; \
+	echo -e "$(C_GREEN)✅ Клиент добавлен$(C_NC)"; \
+	if [ -f "config/wireguard/peer$${PEER_NUM}/peer$${PEER_NUM}.conf" ]; then \
+		echo -e "$(C_CYAN)📄 Конфиг: config/wireguard/peer$${PEER_NUM}/peer$${PEER_NUM}.conf$(C_NC)"; \
+	else \
+		echo -e "$(C_CYAN)📄 Конфиг будет в: config/wireguard/peer$${PEER_NUM}/$(C_NC)"; \
+		echo -e "$(C_YELLOW)   Подожди 10-20 секунд после добавления$(C_NC)"; \
+	fi
 
 # ════════════════════════════════════════════════════════════════════
 # OPENVPN
