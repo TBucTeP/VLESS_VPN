@@ -14,12 +14,32 @@ make install
 
 ## 📋 Требования
 
-- Ubuntu 22.04+ / Debian 12+ (или любой Linux с Docker)
-- Docker + Docker Compose
-- jq (`apt install jq`)
+- Ubuntu 20.04+ / Debian 12+ (или любой Linux с Docker)
+- Root доступ
 - Открытый порт 443
 
-### Быстрая установка зависимостей (Ubuntu/Debian)
+### ⚡ Автоматическая установка зависимостей (рекомендуется)
+
+```bash
+# Клонируй репозиторий
+git clone https://github.com/TBucTeP/VLESS_VPN.git
+cd VLESS_VPN
+
+# Установи все зависимости автоматически (Docker, firewall, пакеты)
+make install-deps
+# или
+bash scripts/00-install-dependencies.sh
+```
+
+Скрипт автоматически:
+- ✅ Установит Docker (для Ubuntu 20.04+ и Debian 12+)
+- ✅ Установит make, jq, openssl, unzip, curl
+- ✅ Настроит UFW firewall (откроет порты 22, 443)
+
+### 📝 Ручная установка (если нужна)
+
+<details>
+<summary>Нажми для просмотра ручной установки</summary>
 
 ```bash
 # Docker (Ubuntu 22.04+, Debian 12+)
@@ -27,12 +47,15 @@ curl -fsSL https://get.docker.com | sh
 
 # Make, jq, openssl, unzip, curl
 apt install -y make jq openssl unzip curl
+
+# Firewall
+ufw allow 22/tcp
+ufw allow 443/tcp
+ufw enable
 ```
 
-### Ubuntu 20.04 (Focal) — ручная установка Docker
-
+Для Ubuntu 20.04:
 ```bash
-# Добавляем репозиторий Docker
 apt-get update
 apt-get install -y ca-certificates curl
 install -m 0755 -d /etc/apt/keyrings
@@ -40,13 +63,11 @@ curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/doc
 chmod a+r /etc/apt/keyrings/docker.asc
 echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu focal stable" > /etc/apt/sources.list.d/docker.list
 apt-get update
-
-# Устанавливаем Docker (без docker-model-plugin)
 apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
-# Остальные зависимости
 apt install -y make jq openssl unzip curl
 ```
+
+</details>
 
 ---
 
