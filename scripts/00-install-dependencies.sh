@@ -86,6 +86,8 @@ ufw default deny incoming 2>/dev/null || true
 ufw default allow outgoing 2>/dev/null || true
 ufw allow 22/tcp comment 'SSH' 2>/dev/null || true
 ufw allow 443/tcp comment 'VLESS/REALITY' 2>/dev/null || true
+ufw allow 51820/udp comment 'WireGuard' 2>/dev/null || true
+ufw allow 1194/udp comment 'OpenVPN' 2>/dev/null || true
 
 # Включаем UFW (неинтерактивно)
 if ! ufw status | grep -q "Status: active"; then
