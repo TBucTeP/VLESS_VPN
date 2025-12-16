@@ -16,3 +16,39 @@ services:
       - no-new-privileges:false
     command: ["run", "-c", "/etc/xray/config.json"]
 
+  wireguard:
+    image: linuxserver/wireguard:latest
+    container_name: wireguard-vpn
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ=Europe/Paris
+      - SERVERURL=auto
+      - SERVERPORT=51820
+      - PEERS=1
+      - PEERDNS=1.1.1.1
+      - INTERNAL_SUBNET=10.66.66.0/24
+    volumes:
+      - ./config/wireguard:/config
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+
+  openvpn:
+    image: kylemanna/openvpn:latest
+    container_name: openvpn-vpn
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "1194:1194/udp"
+    volumes:
+      - ./config/openvpn:/etc/openvpn
+    environment:
+      - OVPN_SERVER_URL=auto
+    command: ovpn_run
+
