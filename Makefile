@@ -18,7 +18,7 @@ C_NC     := \033[0m
 SCRIPTS := scripts
 COMPOSE := docker compose
 
-.PHONY: help install init up down restart logs status diagnostics \
+.PHONY: help install install-deps init up down restart logs status diagnostics \
         add remove list rotate-keys change-sni change-sid clean
 
 # ════════════════════════════════════════════════════════════════════
@@ -30,6 +30,7 @@ help:
 	@echo -e "$(C_BLUE)╚══════════════════════════════════════════════════════════════╝$(C_NC)"
 	@echo ""
 	@echo -e "$(C_GREEN)🚀 Быстрый старт:$(C_NC)"
+	@echo "   make install-deps - Установить все зависимости (Docker, firewall и т.д.)"
 	@echo "   make install     - Полная установка (init + up + показать ссылки)"
 	@echo ""
 	@echo -e "$(C_YELLOW)📦 Docker:$(C_NC)"
@@ -72,9 +73,20 @@ install: check-deps init up
 	@echo ""
 
 check-deps:
-	@command -v docker >/dev/null 2>&1 || { echo -e "$(C_RED)❌ Docker не установлен$(C_NC)"; exit 1; }
-	@command -v jq >/dev/null 2>&1 || { echo -e "$(C_RED)❌ jq не установлен. Установи: apt install jq$(C_NC)"; exit 1; }
+	@command -v docker >/dev/null 2>&1 || { \
+		echo -e "$(C_RED)❌ Docker не установлен$(C_NC)"; \
+		echo -e "$(C_YELLOW)💡 Установи зависимости: bash scripts/00-install-dependencies.sh$(C_NC)"; \
+		exit 1; \
+	}
+	@command -v jq >/dev/null 2>&1 || { \
+		echo -e "$(C_RED)❌ jq не установлен$(C_NC)"; \
+		echo -e "$(C_YELLOW)💡 Установи зависимости: bash scripts/00-install-dependencies.sh$(C_NC)"; \
+		exit 1; \
+	}
 	@docker info >/dev/null 2>&1 || { echo -e "$(C_RED)❌ Docker daemon не запущен$(C_NC)"; exit 1; }
+
+install-deps: check-root
+	@bash $(SCRIPTS)/00-install-dependencies.sh
 
 init: env-file
 	@echo -e "$(C_BLUE)🔧 Генерация конфига...$(C_NC)"
