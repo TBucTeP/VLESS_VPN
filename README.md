@@ -48,7 +48,7 @@ bash scripts/00-install-dependencies.sh
 **Что устанавливается:**
 - ✅ Docker + Docker Compose
 - ✅ make, jq, openssl, unzip, curl
-- ✅ UFW firewall (настраивается автоматически: порты 22, 443)
+- ✅ UFW firewall (настраивается автоматически: порты 22, 443, 51820, 1194)
 
 **Ручная установка (если нужна):**
 
@@ -91,14 +91,18 @@ nano .env
 
 **Параметры:**
 ```env
-# SNI для маскировки (домен Microsoft, Google и т.д.)
+# VLESS/REALITY
 BAIT_SNI=www.microsoft.com
-
-# Порт для VLESS (по умолчанию 443)
 LISTEN_PORT=443
-
-# Количество клиентов при первой генерации
 CLIENTS_COUNT=10
+
+# WireGuard
+WG_PORT=51820
+PEERS_COUNT=1
+
+# OpenVPN
+OVPN_PORT=1194
+OVPN_CLIENTS_COUNT=1
 
 # Публичный IP сервера (автоопределяется если пусто)
 # SERVER_IP=
@@ -189,6 +193,48 @@ make restart
 # Сменить ShortID
 make change-sid
 make restart
+```
+
+### WireGuard команды
+
+| Команда | Описание |
+|---------|----------|
+| `make wireguard-init` | Генерация конфига WireGuard |
+| `make wireguard-up` | Запустить WireGuard |
+| `make wireguard-down` | Остановить WireGuard |
+| `make wireguard-logs` | Логи WireGuard |
+| `make wireguard-add` | Добавить нового клиента |
+
+**Примеры:**
+```bash
+# Установка WireGuard
+make wireguard-up
+
+# Добавить клиента
+make wireguard-add
+
+# Клиентские конфиги в: config/wireguard/peer*/peer*.conf
+```
+
+### OpenVPN команды
+
+| Команда | Описание |
+|---------|----------|
+| `make openvpn-init` | Генерация конфига OpenVPN (CA, сертификаты) |
+| `make openvpn-up` | Запустить OpenVPN |
+| `make openvpn-down` | Остановить OpenVPN |
+| `make openvpn-logs` | Логи OpenVPN |
+| `make openvpn-add` | Добавить нового клиента |
+
+**Примеры:**
+```bash
+# Установка OpenVPN
+make openvpn-up
+
+# Добавить клиента
+make openvpn-add
+
+# Клиентские конфиги в: output/client*.ovpn
 ```
 
 ### Опасные команды
