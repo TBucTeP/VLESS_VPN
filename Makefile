@@ -18,7 +18,7 @@ C_NC     := \033[0m
 SCRIPTS := scripts
 COMPOSE := docker compose
 
-.PHONY: help install install-deps init up down restart logs status diagnostics \
+.PHONY: help install install-deps check-root init up down restart logs status diagnostics \
         add remove list rotate-keys change-sni change-sid clean \
         wireguard-init wireguard-up wireguard-down wireguard-logs wireguard-add \
         openvpn-init openvpn-up openvpn-down openvpn-logs openvpn-add
@@ -99,6 +99,13 @@ check-deps:
 		exit 1; \
 	}
 	@docker info >/dev/null 2>&1 || { echo -e "$(C_RED)❌ Docker daemon не запущен$(C_NC)"; exit 1; }
+
+check-root:
+	@if [ "$$(id -u)" -ne 0 ]; then \
+		echo -e "$(C_RED)❌ Требуются права root$(C_NC)"; \
+		echo -e "$(C_YELLOW)💡 Запусти: sudo make install-deps$(C_NC)"; \
+		exit 1; \
+	fi
 
 install-deps: check-root
 	@bash $(SCRIPTS)/00-install-dependencies.sh
