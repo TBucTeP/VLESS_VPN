@@ -85,7 +85,11 @@ echo "   Настройка правил firewall..."
 ufw default deny incoming 2>/dev/null || true
 ufw default allow outgoing 2>/dev/null || true
 ufw allow 22/tcp comment 'SSH' 2>/dev/null || true
-ufw allow 443/tcp comment 'VLESS/REALITY' 2>/dev/null || true
+# VLESS/REALITY ports (multi-port anti-block)
+ufw allow 2053/tcp comment 'VLESS-TCP-Primary' 2>/dev/null || true
+ufw allow 8443/tcp comment 'VLESS-gRPC-Backup' 2>/dev/null || true
+ufw allow 443/tcp comment 'VLESS-Legacy' 2>/dev/null || true
+# Other VPNs
 ufw allow 51820/udp comment 'WireGuard' 2>/dev/null || true
 ufw allow 1194/udp comment 'OpenVPN' 2>/dev/null || true
 
@@ -106,7 +110,7 @@ echo "📋 Установлено:"
 echo "   ✅ Docker: $(docker --version 2>/dev/null | cut -d' ' -f3 | tr -d ',')"
 echo "   ✅ Docker Compose: $(docker compose version 2>/dev/null | head -1 | awk '{print $4}')"
 echo "   ✅ make, jq, openssl, unzip, curl"
-echo "   ✅ UFW (firewall) настроен: порты 22, 443 открыты"
+echo "   ✅ UFW (firewall) настроен: порты 22, 443, 2053, 8443 открыты"
 echo ""
 echo "🚀 Теперь можно запускать:"
 echo "   cd ~/VLESS_VPN"

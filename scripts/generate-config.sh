@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 #
-# Генерация конфига Xray/REALITY
+# Генерация конфига Xray/REALITY (Multi-Port Anti-Block)
 # Создаёт ключи, UUID клиентов, конфиг и ссылки
+#
+# Порты:
+#   - 2053 (TCP)  - iCloud SNI (основной, редко блокируют)
+#   - 8443 (gRPC) - Google SNI (резервный)
+#   - 443  (TCP)  - опциональный (часто блокируют)
 #
 set -Eeuo pipefail
 
@@ -15,22 +20,33 @@ if [ -f "${PROJECT_DIR}/.env" ]; then
     source "${PROJECT_DIR}/.env"
 fi
 
-# Дефолты
-BAIT_SNI="${BAIT_SNI:-www.microsoft.com}"
-LISTEN_PORT="${LISTEN_PORT:-443}"
+# Дефолты — Anti-Block конфигурация
+PRIMARY_PORT="${PRIMARY_PORT:-2053}"
+GRPC_PORT="${GRPC_PORT:-8443}"
+LEGACY_PORT="${LEGACY_PORT:-443}"
+PRIMARY_SNI="${PRIMARY_SNI:-gateway.icloud.com}"
+GRPC_SNI="${GRPC_SNI:-www.google.com}"
 CLIENTS_COUNT="${CLIENTS_COUNT:-10}"
+ENABLE_LEGACY_PORT="${ENABLE_LEGACY_PORT:-false}"
 
+echo "╔══════════════════════════════════════════════════════════════╗"
+echo "║       🔐 VLESS/REALITY Anti-Block Configuration              ║"
+echo "╚══════════════════════════════════════════════════════════════╝"
+echo ""
 echo "🔧 Генерация конфига VLESS/REALITY..."
-echo "   SNI: ${BAIT_SNI}"
-echo "   Port: ${LISTEN_PORT}"
+echo "   Primary: TCP  port ${PRIMARY_PORT} (SNI: ${PRIMARY_SNI})"
+echo "   gRPC:    gRPC port ${GRPC_PORT} (SNI: ${GRPC_SNI})"
+if [ "$ENABLE_LEGACY_PORT" = "true" ]; then
+    echo "   Legacy:  TCP  port ${LEGACY_PORT} (SNI: ${PRIMARY_SNI})"
+fi
 echo "   Clients: ${CLIENTS_COUNT}"
+echo ""
 
 # Создаём директории
 mkdir -p "${CONFIG_DIR}" "${OUTPUT_DIR}"
 
 # Проверяем наличие xray для генерации ключей
 if ! command -v xray &>/dev/null; then
-    # Скачиваем xray временно для генерации ключей
     echo "📥 Скачиваем xray для генерации ключей..."
     TMP_DIR=$(mktemp -d)
     
@@ -63,7 +79,6 @@ fi
 echo "🔑 Генерация ключей REALITY..."
 KEY_OUTPUT=$("$XRAY_BIN" x25519 2>&1)
 
-# Извлекаем Private Key
 PRIV=$(echo "$KEY_OUTPUT" | grep -i "private" | sed 's/.*: *//' | tr -d ' \t\r\n')
 if [ -z "$PRIV" ]; then
     echo "❌ Не удалось извлечь PrivateKey"
@@ -71,24 +86,19 @@ if [ -z "$PRIV" ]; then
     exit 1
 fi
 
-# Получаем Public Key (в новых версиях Xray он называется "Password")
 PUB_OUTPUT=$("$XRAY_BIN" x25519 -i "$PRIV" 2>&1)
-
-# Пробуем PublicKey (старые версии) или Password (новые версии)
 PUB=$(echo "$PUB_OUTPUT" | grep -i "public" | sed 's/.*: *//' | tr -d ' \t\r\n' || true)
 
 if [ -z "$PUB" ]; then
     PUB=$(echo "$PUB_OUTPUT" | grep -i "password" | sed 's/.*: *//' | tr -d ' \t\r\n' || true)
 fi
 
-# Fallback: ищем любой base64url токен
 if [ -z "$PUB" ]; then
     PUB=$(echo "$PUB_OUTPUT" | grep -Eo '[A-Za-z0-9_-]{43,44}' | grep -v "^${PRIV}$" | head -1 || true)
 fi
 
 if [ -z "$PUB" ]; then
     echo "❌ Не удалось извлечь PublicKey"
-    echo "DEBUG: $PUB_OUTPUT"
     exit 1
 fi
 
@@ -100,9 +110,14 @@ echo "   PublicKey: ${PUB:0:10}..."
 echo "   ShortID: ${SID}"
 
 # Генерация UUID для клиентов
+echo ""
 echo "👥 Генерация ${CLIENTS_COUNT} клиентов..."
 declare -a CLIENT_UUIDS
-CLIENTS_JSON="["
+
+# JSON для клиентов с flow (TCP)
+CLIENTS_TCP="["
+# JSON для клиентов без flow (gRPC)
+CLIENTS_GRPC="["
 
 for i in $(seq 1 "$CLIENTS_COUNT"); do
     if command -v uuidgen &>/dev/null; then
@@ -113,47 +128,120 @@ for i in $(seq 1 "$CLIENTS_COUNT"); do
     CLIENT_UUIDS[$i]="$UUID"
     
     if [ "$i" -gt 1 ]; then
-        CLIENTS_JSON="${CLIENTS_JSON},"
+        CLIENTS_TCP="${CLIENTS_TCP},"
+        CLIENTS_GRPC="${CLIENTS_GRPC},"
     fi
-    CLIENTS_JSON="${CLIENTS_JSON}{\"id\":\"${UUID}\",\"flow\":\"xtls-rprx-vision\"}"
+    CLIENTS_TCP="${CLIENTS_TCP}{\"id\":\"${UUID}\",\"flow\":\"xtls-rprx-vision\"}"
+    CLIENTS_GRPC="${CLIENTS_GRPC}{\"id\":\"${UUID}\"}"
 done
-CLIENTS_JSON="${CLIENTS_JSON}]"
+CLIENTS_TCP="${CLIENTS_TCP}]"
+CLIENTS_GRPC="${CLIENTS_GRPC}]"
 
-# Создание конфига Xray
-echo "📝 Создание конфига..."
+# Создание конфига Xray (Multi-Port)
+echo "📝 Создание multi-port конфига..."
+
+# Формируем inbounds
+INBOUNDS="["
+
+# 1. Primary TCP inbound (port 2053, iCloud SNI)
+INBOUNDS="${INBOUNDS}
+    {
+      \"tag\": \"vless-reality-tcp\",
+      \"port\": ${PRIMARY_PORT},
+      \"listen\": \"0.0.0.0\",
+      \"protocol\": \"vless\",
+      \"settings\": {
+        \"clients\": ${CLIENTS_TCP},
+        \"decryption\": \"none\"
+      },
+      \"streamSettings\": {
+        \"network\": \"tcp\",
+        \"security\": \"reality\",
+        \"realitySettings\": {
+          \"show\": false,
+          \"dest\": \"${PRIMARY_SNI}:443\",
+          \"serverNames\": [\"${PRIMARY_SNI}\"],
+          \"privateKey\": \"${PRIV}\",
+          \"shortIds\": [\"${SID}\", \"\"]
+        }
+      },
+      \"sniffing\": {
+        \"enabled\": true,
+        \"destOverride\": [\"http\", \"tls\", \"quic\"]
+      }
+    }"
+
+# 2. gRPC inbound (port 8443, Google SNI)
+INBOUNDS="${INBOUNDS},
+    {
+      \"tag\": \"vless-reality-grpc\",
+      \"port\": ${GRPC_PORT},
+      \"listen\": \"0.0.0.0\",
+      \"protocol\": \"vless\",
+      \"settings\": {
+        \"clients\": ${CLIENTS_GRPC},
+        \"decryption\": \"none\"
+      },
+      \"streamSettings\": {
+        \"network\": \"grpc\",
+        \"grpcSettings\": {
+          \"serviceName\": \"grpc\"
+        },
+        \"security\": \"reality\",
+        \"realitySettings\": {
+          \"show\": false,
+          \"dest\": \"${GRPC_SNI}:443\",
+          \"serverNames\": [\"${GRPC_SNI}\"],
+          \"privateKey\": \"${PRIV}\",
+          \"shortIds\": [\"${SID}\", \"\"]
+        }
+      },
+      \"sniffing\": {
+        \"enabled\": true,
+        \"destOverride\": [\"http\", \"tls\", \"quic\"]
+      }
+    }"
+
+# 3. Legacy TCP inbound (port 443) — optional
+if [ "$ENABLE_LEGACY_PORT" = "true" ]; then
+    INBOUNDS="${INBOUNDS},
+    {
+      \"tag\": \"vless-reality-legacy\",
+      \"port\": ${LEGACY_PORT},
+      \"listen\": \"0.0.0.0\",
+      \"protocol\": \"vless\",
+      \"settings\": {
+        \"clients\": ${CLIENTS_TCP},
+        \"decryption\": \"none\"
+      },
+      \"streamSettings\": {
+        \"network\": \"tcp\",
+        \"security\": \"reality\",
+        \"realitySettings\": {
+          \"show\": false,
+          \"dest\": \"${PRIMARY_SNI}:443\",
+          \"serverNames\": [\"${PRIMARY_SNI}\"],
+          \"privateKey\": \"${PRIV}\",
+          \"shortIds\": [\"${SID}\", \"\"]
+        }
+      },
+      \"sniffing\": {
+        \"enabled\": true,
+        \"destOverride\": [\"http\", \"tls\", \"quic\"]
+      }
+    }"
+fi
+
+INBOUNDS="${INBOUNDS}
+  ]"
+
+# Полный конфиг
 cat > "${CONFIG_DIR}/config.json" <<EOF
 {
   "log": {
-    "loglevel": "warning"
+    "loglevel": "info"
   },
-  "inbounds": [
-    {
-      "tag": "vless-reality-in",
-      "port": ${LISTEN_PORT},
-      "listen": "0.0.0.0",
-      "protocol": "vless",
-      "settings": {
-        "clients": ${CLIENTS_JSON},
-        "decryption": "none"
-      },
-      "streamSettings": {
-        "network": "tcp",
-        "security": "reality",
-        "realitySettings": {
-          "show": false,
-          "dest": "${BAIT_SNI}:443",
-          "serverNames": ["${BAIT_SNI}"],
-          "privateKey": "${PRIV}",
-          "shortIds": ["${SID}"]
-        }
-      },
-      "sniffing": {
-        "enabled": true,
-        "destOverride": ["http", "tls", "quic"],
-        "routeOnly": false
-      }
-    }
-  ],
+  "inbounds": ${INBOUNDS},
   "outbounds": [
     {
       "protocol": "freedom",
@@ -172,6 +260,7 @@ cat > "${CONFIG_DIR}/config.json" <<EOF
 EOF
 
 # Определение публичного IP
+echo ""
 echo "🌐 Определение публичного IP..."
 if [ -n "${SERVER_IP:-}" ]; then
     PUBIP="$SERVER_IP"
@@ -188,35 +277,66 @@ echo "   IP: ${PUBIP}"
 echo "📄 Генерация ссылок..."
 {
     echo "# ════════════════════════════════════════════════════════════"
-    echo "# VLESS/REALITY Clients"
+    echo "# VLESS/REALITY Clients (Anti-Block Multi-Port)"
     echo "# Generated: $(date)"
     echo "# ════════════════════════════════════════════════════════════"
     echo "#"
-    echo "# Server: ${PUBIP}:${LISTEN_PORT}"
-    echo "# SNI: ${BAIT_SNI}"
+    echo "# Server: ${PUBIP}"
     echo "# PublicKey (pbk): ${PUB}"
     echo "# ShortID (sid): ${SID}"
+    echo "#"
+    echo "# Ports:"
+    echo "#   - ${PRIMARY_PORT} TCP  (${PRIMARY_SNI}) — primary, recommended"
+    echo "#   - ${GRPC_PORT} gRPC (${GRPC_SNI}) — backup"
+    if [ "$ENABLE_LEGACY_PORT" = "true" ]; then
+        echo "#   - ${LEGACY_PORT} TCP  (${PRIMARY_SNI}) — legacy (often blocked)"
+    fi
     echo "#"
     echo "# ════════════════════════════════════════════════════════════"
     echo ""
     
     for i in $(seq 1 "$CLIENTS_COUNT"); do
         UUID="${CLIENT_UUIDS[$i]}"
-        LINK="vless://${UUID}@${PUBIP}:${LISTEN_PORT}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${BAIT_SNI}&fp=chrome&pbk=${PUB}&sid=${SID}&type=tcp#VLESS-${i}"
+        
+        # Primary TCP link
+        LINK_TCP="vless://${UUID}@${PUBIP}:${PRIMARY_PORT}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${PRIMARY_SNI}&fp=chrome&pbk=${PUB}&sid=${SID}&type=tcp#VLESS-${i}-TCP"
+        
+        # gRPC link
+        LINK_GRPC="vless://${UUID}@${PUBIP}:${GRPC_PORT}?encryption=none&security=reality&sni=${GRPC_SNI}&fp=chrome&pbk=${PUB}&sid=${SID}&type=grpc&serviceName=grpc#VLESS-${i}-gRPC"
+        
         echo "[Client ${i}]"
         echo "UUID: ${UUID}"
-        echo "Link: ${LINK}"
+        echo ""
+        echo "🔹 TCP (Primary - port ${PRIMARY_PORT}):"
+        echo "${LINK_TCP}"
+        echo ""
+        echo "🔹 gRPC (Backup - port ${GRPC_PORT}):"
+        echo "${LINK_GRPC}"
+        
+        if [ "$ENABLE_LEGACY_PORT" = "true" ]; then
+            LINK_LEGACY="vless://${UUID}@${PUBIP}:${LEGACY_PORT}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${PRIMARY_SNI}&fp=chrome&pbk=${PUB}&sid=${SID}&type=tcp#VLESS-${i}-Legacy"
+            echo ""
+            echo "🔹 Legacy (port ${LEGACY_PORT}):"
+            echo "${LINK_LEGACY}"
+        fi
+        
+        echo ""
+        echo "────────────────────────────────────────────────────────────────"
         echo ""
     done
 } > "${OUTPUT_DIR}/clients.txt"
 
-# Сохраняем ключи отдельно (для утилит)
+# Сохраняем ключи
 cat > "${CONFIG_DIR}/.keys" <<EOF
 PRIVATE_KEY=${PRIV}
 PUBLIC_KEY=${PUB}
 SHORT_ID=${SID}
-SNI=${BAIT_SNI}
-PORT=${LISTEN_PORT}
+PRIMARY_SNI=${PRIMARY_SNI}
+GRPC_SNI=${GRPC_SNI}
+PRIMARY_PORT=${PRIMARY_PORT}
+GRPC_PORT=${GRPC_PORT}
+LEGACY_PORT=${LEGACY_PORT}
+ENABLE_LEGACY_PORT=${ENABLE_LEGACY_PORT}
 EOF
 
 # Cleanup
@@ -232,5 +352,11 @@ echo ""
 echo "📁 Конфиг: ${CONFIG_DIR}/config.json"
 echo "📄 Ссылки: ${OUTPUT_DIR}/clients.txt"
 echo ""
+echo "🔐 Порты (все нужно открыть в firewall):"
+echo "   - ${PRIMARY_PORT}/tcp (TCP primary)"
+echo "   - ${GRPC_PORT}/tcp (gRPC backup)"
+if [ "$ENABLE_LEGACY_PORT" = "true" ]; then
+    echo "   - ${LEGACY_PORT}/tcp (Legacy)"
+fi
+echo ""
 echo "Запуск: make up"
-
