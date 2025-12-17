@@ -20,13 +20,14 @@ services:
     image: linuxserver/wireguard:latest
     container_name: wireguard-vpn
     restart: unless-stopped
-    network_mode: host
+    ports:
+      - "${WG_PORT:-51820}:51820/udp"
     environment:
       - PUID=0
       - PGID=0
       - TZ=Europe/Paris
       - SERVERURL=auto
-      - SERVERPORT=51820
+      - SERVERPORT=${WG_PORT:-51820}
       - PEERS=1
       - PEERDNS=1.1.1.1
       - INTERNAL_SUBNET=10.66.66.0/24
@@ -36,6 +37,7 @@ services:
       - NET_ADMIN
       - SYS_MODULE
     sysctls:
+      - net.ipv4.ip_forward=1
       - net.ipv4.conf.all.src_valid_mark=1
 
   openvpn:
