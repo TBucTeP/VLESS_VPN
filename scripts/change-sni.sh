@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Смена SNI (домена для маскировки)
+# Смена SNI (домена для маскировки) для TCP портов
 #
 set -Eeuo pipefail
 
@@ -16,9 +16,9 @@ if [ -z "$NEW_SNI" ]; then
     echo "   Использование: $0 <domain>"
     echo ""
     echo "   Примеры SNI:"
+    echo "   - gateway.icloud.com (по умолчанию)"
     echo "   - www.microsoft.com"
     echo "   - login.microsoftonline.com"
-    echo "   - www.google.com"
     echo "   - cloudflare.com"
     exit 1
 fi
@@ -33,18 +33,21 @@ if ! command -v jq &>/dev/null; then
     exit 1
 fi
 
-echo "🔄 Смена SNI на: ${NEW_SNI}"
+echo "🔄 Смена SNI для TCP портов на: ${NEW_SNI}"
 
-# Обновляем конфиг
+# Обновляем конфиг (только TCP inbounds)
 jq --arg sni "$NEW_SNI" \
-   '.inbounds[0].streamSettings.realitySettings.serverNames = [$sni] | 
-    .inbounds[0].streamSettings.realitySettings.dest = ($sni + ":443")' \
+   '.inbounds |= map(if .streamSettings.network == "tcp" then .streamSettings.realitySettings.serverNames = [$sni] | .streamSettings.realitySettings.dest = ($sni + ":443") else . end)' \
    "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 
 # Обновляем файл ключей
 if [ -f "$KEYS_FILE" ]; then
-    sed -i.bak "s/^SNI=.*/SNI=${NEW_SNI}/" "$KEYS_FILE" 2>/dev/null || \
-    sed -i '' "s/^SNI=.*/SNI=${NEW_SNI}/" "$KEYS_FILE"
+    if grep -q "^PRIMARY_SNI=" "$KEYS_FILE"; then
+        sed -i.bak "s/^PRIMARY_SNI=.*/PRIMARY_SNI=${NEW_SNI}/" "$KEYS_FILE" 2>/dev/null || \
+        sed -i '' "s/^PRIMARY_SNI=.*/PRIMARY_SNI=${NEW_SNI}/" "$KEYS_FILE"
+    else
+        echo "PRIMARY_SNI=${NEW_SNI}" >> "$KEYS_FILE"
+    fi
     rm -f "${KEYS_FILE}.bak"
 fi
 
@@ -52,5 +55,5 @@ echo ""
 echo "✅ SNI изменён на: ${NEW_SNI}"
 echo ""
 echo "⚠️  Перезапусти контейнер: make restart"
-echo "⚠️  Все ссылки теперь с новым SNI: make list"
+echo "⚠️  Обнови ссылки: make list"
 

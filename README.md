@@ -1,16 +1,13 @@
-# 🔐 Multi-Protocol VPN Server
+# 🔐 VLESS/REALITY VPN Server
 
-Автоматическое развертывание VPN сервера через Docker:
-- **VLESS/REALITY** (Xray-core) — маскировка трафика
-- **WireGuard** — быстрый и современный
-- **OpenVPN** — проверенный временем
+Автоматическое развертывание VPN сервера через Docker с **VLESS/REALITY** (Xray-core) — маскировка трафика под реальные сайты.
 
 **Быстрый старт:**
 ```bash
 git clone https://github.com/TBucTeP/VLESS_VPN.git
 cd VLESS_VPN
-make install-deps  # Установка зависимостей
-make install        # Установка VPN
+sudo make install-deps  # Установка зависимостей
+make install            # Установка VPN
 ```
 
 **Готово!** Ссылки для клиентов в `output/clients.txt`
@@ -21,7 +18,7 @@ make install        # Установка VPN
 
 - **ОС**: Ubuntu 20.04+ / Debian 12+ (или любой Linux с поддержкой Docker)
 - **Права**: Root доступ (sudo)
-- **Порт**: 443 (или другой, настраивается в `.env`)
+- **Порты**: 2053, 8443 (кастомные, настраиваются в `.env`)
 - **Интернет**: Стабильное подключение для скачивания Docker и пакетов
 
 ---
@@ -40,48 +37,18 @@ cd VLESS_VPN
 **Автоматическая установка (рекомендуется):**
 
 ```bash
-make install-deps
+sudo make install-deps
 ```
 
 Или вручную:
 ```bash
-bash scripts/00-install-dependencies.sh
+sudo bash scripts/00-install-dependencies.sh
 ```
 
 **Что устанавливается:**
 - ✅ Docker + Docker Compose
 - ✅ make, jq, openssl, unzip, curl
-- ✅ UFW firewall (настраивается автоматически: порты 22, 443, 51820, 1194)
-
-**Ручная установка (если нужна):**
-
-<details>
-<summary>Нажми для просмотра</summary>
-
-```bash
-# Docker (Ubuntu 22.04+, Debian 12+)
-curl -fsSL https://get.docker.com | sh
-
-# Для Ubuntu 20.04
-apt-get update
-apt-get install -y ca-certificates curl
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-chmod a+r /etc/apt/keyrings/docker.asc
-echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu focal stable" > /etc/apt/sources.list.d/docker.list
-apt-get update
-apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
-# Остальные пакеты
-apt install -y make jq openssl unzip curl
-
-# Firewall
-ufw allow 22/tcp
-ufw allow 443/tcp
-ufw --force enable
-```
-
-</details>
+- ✅ UFW firewall (настраивается автоматически: порты 22, 2053, 8443, 443)
 
 ### Шаг 3: Настройка (опционально)
 
@@ -94,29 +61,28 @@ nano .env
 
 **Параметры:**
 ```env
-# VLESS/REALITY
-BAIT_SNI=www.microsoft.com
-LISTEN_PORT=443
+# SNI для маскировки (домен Microsoft, Google, и т.д.)
+BAIT_SNI=gateway.icloud.com
+
+# Порт для VLESS TCP (по умолчанию 2053)
+PRIMARY_PORT=2053
+
+# Порт для VLESS gRPC (по умолчанию 8443)
+GRPC_PORT=8443
+
+# Количество клиентов при первой генерации
 CLIENTS_COUNT=10
-
-# WireGuard
-WG_PORT=51820
-PEERS_COUNT=1
-
-# OpenVPN
-OVPN_PORT=1194
-OVPN_CLIENTS_COUNT=1
 
 # Публичный IP сервера (автоопределяется если пусто)
 # SERVER_IP=
 ```
 
 **Рекомендуемые SNI:**
-- `www.microsoft.com` (по умолчанию, хорошо работает)
+- `gateway.icloud.com` (по умолчанию, хорошо работает)
+- `www.microsoft.com`
 - `login.microsoftonline.com`
 - `www.google.com`
 - `cloudflare.com`
-- `www.apple.com`
 
 ### Шаг 4: Установка VPN
 
@@ -127,7 +93,7 @@ make install
 **Что происходит:**
 1. Генерируются ключи REALITY (приватный/публичный)
 2. Создаются UUID для клиентов
-3. Генерируется конфиг Xray
+3. Генерируется конфиг Xray с multi-port
 4. Запускается Docker контейнер
 5. Выводятся ссылки для подключения
 
@@ -198,48 +164,6 @@ make change-sid
 make restart
 ```
 
-### WireGuard команды
-
-| Команда | Описание |
-|---------|----------|
-| `make wireguard-init` | Генерация конфига WireGuard |
-| `make wireguard-up` | Запустить WireGuard |
-| `make wireguard-down` | Остановить WireGuard |
-| `make wireguard-logs` | Логи WireGuard |
-| `make wireguard-add` | Добавить нового клиента |
-
-**Примеры:**
-```bash
-# Установка WireGuard
-make wireguard-up
-
-# Добавить клиента
-make wireguard-add
-
-# Клиентские конфиги в: config/wireguard/peer*/peer*.conf
-```
-
-### OpenVPN команды
-
-| Команда | Описание |
-|---------|----------|
-| `make openvpn-init` | Генерация конфига OpenVPN (CA, сертификаты) |
-| `make openvpn-up` | Запустить OpenVPN |
-| `make openvpn-down` | Остановить OpenVPN |
-| `make openvpn-logs` | Логи OpenVPN |
-| `make openvpn-add` | Добавить нового клиента |
-
-**Примеры:**
-```bash
-# Установка OpenVPN
-make openvpn-up
-
-# Добавить клиента
-make openvpn-add
-
-# Клиентские конфиги в: output/client*.ovpn
-```
-
 ### Опасные команды
 
 | Команда | Описание |
@@ -273,31 +197,23 @@ make openvpn-add
 2. Тип: **VLESS**
 3. Заполни:
    - **Address**: IP сервера (из `make list`)
-   - **Port**: `443` (или другой из `.env`)
+   - **Port**: `2053` (TCP) или `8443` (gRPC)
    - **UUID**: из ссылки (`make list`)
    - **Encryption**: `none`
-   - **Flow**: `xtls-rprx-vision`
-   - **Network**: `TCP`
+   - **Flow**: `xtls-rprx-vision` (только для TCP)
+   - **Network**: `TCP` или `gRPC`
    - **TLS**: `Выключено`
-   - **SNI**: `www.microsoft.com` (в секции TLS)
-   - **XTLS**: `xtls-rprx-vision` (в секции XTLS)
+   - **SNI**: `gateway.icloud.com` (в секции TLS)
    - **Открытый ключ** (Public key): из ссылки (pbk)
    - **Краткий ID** (Short ID): из ссылки (sid)
    - **Fingerprint**: `chrome` (если есть поле)
 4. **Save** → включи переключатель
-
-**Проверка:**
-- Зелёный индикатор в Shadowrocket
-- Проверь IP: https://ifconfig.me (должен быть IP сервера)
 
 #### V2Box (iOS, бесплатный)
 
 1. Скопируй ссылку из `make list`
 2. Открой V2Box → **+** → **Import from Clipboard**
 3. Или **Scan QR Code**
-4. Если не работает — ручная настройка:
-   - **Manual** → **VLESS**
-   - Заполни все поля как в Shadowrocket
 
 ### Android
 
@@ -321,7 +237,6 @@ make openvpn-add
 1. Скопируй ссылку из `make list`
 2. Открой v2rayN
 3. Нажми **Серверы** → **Импорт серверов из буфера обмена**
-4. Или **Серверы** → **Добавить сервер** → вставь ссылку
 
 #### Nekoray
 
@@ -330,15 +245,10 @@ make openvpn-add
 
 ### macOS
 
-#### V2RayXS
+#### V2RayXS / Nekoray
 
 1. Скопируй ссылку из `make list`
-2. Открой V2RayXS → **Servers** → **Import from Clipboard**
-
-#### Nekoray
-
-1. Скопируй ссылку из `make list`
-2. Открой Nekoray → **File** → **Import from Clipboard**
+2. Открой приложение → **Servers/File** → **Import from Clipboard**
 
 ---
 
@@ -347,16 +257,14 @@ make openvpn-add
 ```
 VLESS_VPN/
 ├── docker-compose.yml          # Docker конфигурация
-├── Makefile                     # Команды управления
-├── .env.example                 # Пример настроек
-├── .env                         # Твои настройки (создаётся автоматически)
-├── .gitignore                   # Игнорируемые файлы
-├── README.md                    # Эта документация
+├── Makefile                    # Команды управления
+├── .env.example                # Пример настроек
+├── .env                        # Твои настройки (создаётся автоматически)
+├── .gitignore                  # Игнорируемые файлы
+├── README.md                   # Эта документация
 │
-├── scripts/                     # Скрипты управления
+├── scripts/                    # Скрипты управления
 │   ├── 00-install-dependencies.sh  # Установка зависимостей
-│   ├── 00-prepare-vps.sh           # Подготовка VPS (устарело)
-│   ├── 01-setup-xray-reality.sh    # Установка Xray (устарело)
 │   ├── generate-config.sh          # Генерация конфига и ключей
 │   ├── add-client.sh               # Добавить клиента
 │   ├── remove-client.sh            # Удалить клиента
@@ -366,14 +274,14 @@ VLESS_VPN/
 │   ├── change-sid.sh               # Сменить ShortID
 │   └── diagnostics.sh              # Диагностика
 │
-├── config/                       # Конфиг Xray (генерируется)
-│   ├── config.json                # Основной конфиг
-│   └── .keys                      # Приватные ключи (НЕ ПУБЛИКУЙ!)
+├── config/                      # Конфиг Xray (генерируется)
+│   ├── config.json              # Основной конфиг
+│   └── .keys                    # Приватные ключи (НЕ ПУБЛИКУЙ!)
 │
-├── output/                        # Ссылки клиентов (генерируется)
-│   └── clients.txt                # Все ссылки для подключения
+├── output/                      # Ссылки клиентов (генерируется)
+│   └── clients.txt              # Все ссылки для подключения
 │
-└── logs/                          # Логи Xray (если включено)
+└── logs/                        # Логи Xray (если включено)
 ```
 
 ---
@@ -395,7 +303,7 @@ make logs
 
 ### Частые проблемы
 
-#### 1. Порт 443 не доступен извне
+#### 1. Порт не доступен извне
 
 **Симптомы:**
 - Клиент не подключается (timeout)
@@ -403,19 +311,15 @@ make logs
 
 **Решение:**
 ```bash
-# Проверь firewall провайдера
-# Многие провайдеры блокируют порт 443
+# Проверь firewall провайдера/хостера
+# Многие блокируют нестандартные порты
 
-# Используй другой порт
-nano .env
-# Измени LISTEN_PORT=443 на LISTEN_PORT=8443
-
-# Открой новый порт
+# Открой порты в UFW
+ufw allow 2053/tcp
 ufw allow 8443/tcp
 
-# Пересоздай конфиг
-rm -rf config output
-make install
+# Проверь что порты открыты
+ufw status
 ```
 
 #### 2. Клиент не подключается
@@ -424,7 +328,7 @@ make install
 1. Все поля в клиенте заполнены правильно
 2. Ключи совпадают (Public Key, Short ID)
 3. SNI совпадает
-4. Порт правильный
+4. Порт правильный (2053 TCP или 8443 gRPC)
 
 **Решение:**
 ```bash
@@ -437,19 +341,7 @@ rm -rf config output
 make install
 ```
 
-#### 3. Ошибка "permission denied" при запуске
-
-**Симптомы:**
-- `listen tcp 0.0.0.0:443: bind: permission denied`
-
-**Решение:**
-Контейнер уже запущен от root, проверь:
-```bash
-docker ps | grep xray
-docker logs xray-vless
-```
-
-#### 4. Контейнер постоянно перезапускается
+#### 3. Контейнер постоянно перезапускается
 
 **Симптомы:**
 - `docker ps` показывает `Restarting`
@@ -467,41 +359,23 @@ rm -rf config output
 make install
 ```
 
-#### 5. Ссылка не импортируется в клиент
-
-**Решение:**
-- Убедись что ссылка скопирована полностью (от `vless://` до `#VLESS-X`)
-- Попробуй ручную настройку
-- Проверь версию клиента (обнови до последней)
-
-### Проверка подключения
-
-```bash
-# На сервере - проверь логи при попытке подключения
-docker logs xray-vless --tail 50 -f
-
-# Если видишь попытки подключения - сервер работает
-# Если нет - проблема в сети/firewall
-```
-
 ---
 
 ## 🔒 Безопасность
 
 ### Firewall (UFW)
 
-Firewall настраивается автоматически при `make install-deps`, но можно настроить вручную:
+Firewall настраивается автоматически при `make install-deps`:
 
 ```bash
-# Открыть порты
-ufw allow 22/tcp    # SSH
-ufw allow 443/tcp   # VLESS
-
-# Включить
-ufw enable
-
 # Проверить статус
 ufw status verbose
+
+# Открытые порты:
+# - 22/tcp   (SSH)
+# - 2053/tcp (VLESS TCP Primary)
+# - 8443/tcp (VLESS gRPC Backup)
+# - 443/tcp  (VLESS Legacy - опционально)
 ```
 
 ### Ротация ключей
@@ -513,18 +387,6 @@ ufw status verbose
 make rotate-keys
 make restart
 make list  # Получи новые ссылки
-
-# Раздай новые ссылки всем клиентам
-```
-
-### Смена SNI
-
-Если SNI заблокирован, смени на другой:
-
-```bash
-make change-sni SNI=login.microsoftonline.com
-make restart
-make list  # Обнови ссылки
 ```
 
 ### Рекомендации
@@ -560,7 +422,7 @@ scp root@old-server:~/VLESS_VPN/vless-backup.tar.gz .
 tar -xzf vless-backup.tar.gz
 
 # Запусти
-make install-deps  # Если ещё не установлено
+sudo make install-deps  # Если ещё не установлено
 make up
 ```
 
@@ -579,12 +441,11 @@ cd ~/VLESS_VPN
 # Обнови код
 git pull
 
-# Перезапусти контейнер (если нужно)
+# Перезапусти контейнер
 make restart
 
-# Или пересоздай конфиг (если изменились скрипты)
-rm -rf config output
-make install
+# Или обнови Docker образ
+docker compose pull && docker compose up -d
 ```
 
 ---
@@ -594,7 +455,7 @@ make install
 ### Технологии
 
 - **VLESS**: Протокол VPN (без шифрования, быстрый)
-- **REALITY**: Маскировка трафика под реальный сайт (Microsoft, Google)
+- **REALITY**: Маскировка трафика под реальный сайт (iCloud, Google, Microsoft)
 - **Xray-core**: Серверная часть (форк V2Ray)
 - **Docker**: Контейнеризация для простоты
 
@@ -604,6 +465,16 @@ make install
 2. Сервер маскирует трафик под реальный сайт (SNI)
 3. Для внешнего наблюдателя это выглядит как обычное HTTPS соединение
 4. Невозможно отличить от реального трафика
+
+### Multi-Port конфигурация
+
+Сервер слушает на нескольких портах для обхода блокировок:
+
+| Порт | Протокол | SNI | Назначение |
+|------|----------|-----|------------|
+| 2053 | TCP | gateway.icloud.com | Primary (основной) |
+| 8443 | gRPC | www.google.com | Backup (резервный) |
+| 443 | TCP | gateway.icloud.com | Legacy (опционально) |
 
 ### Полезные ссылки
 
@@ -615,23 +486,26 @@ make install
 
 ## ❓ FAQ
 
-**Q: Можно ли использовать другой порт?**  
-A: Да, измени `LISTEN_PORT` в `.env` и открой порт в firewall.
+**Q: Можно ли использовать другие порты?**  
+A: Да, измени `PRIMARY_PORT` и `GRPC_PORT` в `.env` и открой порты в firewall.
 
 **Q: Сколько клиентов можно добавить?**  
 A: Неограниченно, используй `make add`.
 
-**Q: Что делать если провайдер блокирует порт 443?**  
-A: Используй другой порт (8443, 4443, 2053) в `.env`.
+**Q: Что делать если провайдер блокирует порты?**  
+A: Попробуй разные порты (443, 8443, 2053, 4443) в `.env`.
 
 **Q: Можно ли использовать на VPS без root?**  
-A: Нет, нужен root для привязки к порту 443.
+A: Нет, нужен root для привязки к привилегированным портам.
 
 **Q: Как обновить Xray?**  
 A: `docker compose pull && docker compose up -d`
 
 **Q: Безопасно ли публиковать ссылки?**  
-A: Нет! Ссылки содержат приватные ключи. Делись только с доверенными людьми.
+A: Нет! Ссылки содержат ключи доступа. Делись только с доверенными людьми.
+
+**Q: Какой порт лучше использовать?**  
+A: 2053 TCP (primary) - основной, 8443 gRPC - резервный если TCP блокируют.
 
 ---
 

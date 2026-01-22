@@ -24,9 +24,9 @@ NEW_SID=$(openssl rand -hex 8)
 
 echo "🔄 Новый ShortID: ${NEW_SID}"
 
-# Обновляем конфиг
+# Обновляем конфиг (все inbounds)
 jq --arg sid "$NEW_SID" \
-   '.inbounds[0].streamSettings.realitySettings.shortIds = [$sid]' \
+   '.inbounds |= map(.streamSettings.realitySettings.shortIds = [$sid, ""])' \
    "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 
 # Обновляем файл ключей

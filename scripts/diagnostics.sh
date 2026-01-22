@@ -33,9 +33,9 @@ echo "2️⃣  Порты (${PRIMARY_PORT}, ${GRPC_PORT}):"
 for PORT in $PRIMARY_PORT $GRPC_PORT; do
     if ss -ltnp 2>/dev/null | grep -q ":${PORT}"; then
         echo "   ✅ Порт ${PORT} слушает"
-    else
+else
         echo "   ❌ Порт ${PORT} НЕ слушает!"
-    fi
+fi
 done
 echo ""
 
@@ -70,10 +70,10 @@ if [ -f "$CONFIG_FILE" ]; then
         if [ -n "$SNI" ] && [ "$SNI" != "null" ]; then
             if curl -fsSL -4 --connect-timeout 3 "https://${SNI}" >/dev/null 2>&1; then
                 echo "   ✅ ${SNI} — доступен"
-            else
+        else
                 echo "   ⚠️  ${SNI} — недоступен (это может быть нормально)"
-            fi
         fi
+    fi
     done <<< "$SNIS"
     echo ""
 fi
@@ -134,7 +134,7 @@ if [ -f "$CONFIG_FILE" ]; then
     done
     echo ""
     echo "   PublicKey: ${PUBLIC_KEY:-<смотри в config/.keys>}"
-fi
+    fi
 echo ""
 
 # 10. Рекомендации

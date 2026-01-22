@@ -68,27 +68,32 @@ echo "   PrivateKey: ${PRIV:0:20}..."
 echo "   PublicKey: ${PUB:0:20}..."
 echo "   ShortID: ${SID}"
 
-# Обновляем конфиг
+# Обновляем конфиг (все inbounds)
 if command -v jq &>/dev/null; then
     jq --arg pk "$PRIV" --arg sid "$SID" \
-       '.inbounds[0].streamSettings.realitySettings.privateKey = $pk | 
-        .inbounds[0].streamSettings.realitySettings.shortIds = [$sid]' \
+       '.inbounds |= map(.streamSettings.realitySettings.privateKey = $pk | .streamSettings.realitySettings.shortIds = [$sid, ""])' \
        "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 else
     echo "❌ jq не установлен"
     exit 1
 fi
 
-# Обновляем файл ключей
-SNI=$(jq -r '.inbounds[0].streamSettings.realitySettings.serverNames[0]' "$CONFIG_FILE")
-PORT=$(jq -r '.inbounds[0].port' "$CONFIG_FILE")
+# Загружаем текущие настройки
+if [ -f "$KEYS_FILE" ]; then
+    source "$KEYS_FILE"
+fi
 
+# Обновляем файл ключей
 cat > "${KEYS_FILE}" <<EOF
 PRIVATE_KEY=${PRIV}
 PUBLIC_KEY=${PUB}
 SHORT_ID=${SID}
-SNI=${SNI}
-PORT=${PORT}
+PRIMARY_SNI=${PRIMARY_SNI:-gateway.icloud.com}
+GRPC_SNI=${GRPC_SNI:-www.google.com}
+PRIMARY_PORT=${PRIMARY_PORT:-2053}
+GRPC_PORT=${GRPC_PORT:-8443}
+LEGACY_PORT=${LEGACY_PORT:-443}
+ENABLE_LEGACY_PORT=${ENABLE_LEGACY_PORT:-false}
 EOF
 
 echo ""

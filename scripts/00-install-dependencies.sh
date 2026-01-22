@@ -89,9 +89,6 @@ ufw allow 22/tcp comment 'SSH' 2>/dev/null || true
 ufw allow 2053/tcp comment 'VLESS-TCP-Primary' 2>/dev/null || true
 ufw allow 8443/tcp comment 'VLESS-gRPC-Backup' 2>/dev/null || true
 ufw allow 443/tcp comment 'VLESS-Legacy' 2>/dev/null || true
-# Other VPNs
-ufw allow 51820/udp comment 'WireGuard' 2>/dev/null || true
-ufw allow 1194/udp comment 'OpenVPN' 2>/dev/null || true
 
 # Включаем UFW (неинтерактивно)
 if ! ufw status | grep -q "Status: active"; then
@@ -116,4 +113,3 @@ echo "🚀 Теперь можно запускать:"
 echo "   cd ~/VLESS_VPN"
 echo "   make install"
 echo ""
-
