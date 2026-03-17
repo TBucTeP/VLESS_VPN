@@ -12,7 +12,8 @@ endif
 
 .PHONY: help setup install install-deps check-deps check-root env-file \
         init up down restart logs status diagnostics \
-        add remove list rotate-keys change-sni change-sid gen-keys admin clean
+        add remove list qr rotate-keys change-sni change-sid gen-keys admin \
+        backup restore test-connection clean
 
 # ================================================================
 # HELP
@@ -44,11 +45,19 @@ help:
 	@echo "    make list                   Show all clients with links"
 	@echo "    make add                    Add a client"
 	@echo "    make remove UUID=<uuid>     Remove a client"
+	@echo "    make qr                     Show QR codes for all clients"
+	@echo "    make qr N=3                 Show QR for client #3"
 	@echo ""
 	@echo "  Security (standalone only):"
 	@echo "    make rotate-keys            Rotate Reality keys"
 	@echo "    make change-sni SNI=<domain>"
 	@echo "    make change-sid             Change ShortID"
+	@echo ""
+	@echo "  Tools:"
+	@echo "    make test-connection        Test VPN connectivity"
+	@echo "    make backup                 Backup configs + keys + data"
+	@echo "    make restore                Restore from latest backup"
+	@echo "    make restore FILE=<path>    Restore from specific backup"
 	@echo ""
 	@echo "  Danger:"
 	@echo "    make clean                  Remove container + all data"
@@ -174,6 +183,13 @@ endif
 list:
 	@bash $(SCRIPTS)/list-clients.sh
 
+qr:
+ifdef N
+	@bash $(SCRIPTS)/qr.sh $(N)
+else
+	@bash $(SCRIPTS)/qr.sh
+endif
+
 # ================================================================
 # STANDALONE: security
 # ================================================================
@@ -196,6 +212,23 @@ change-sid:
 # ================================================================
 admin:
 	@docker exec -it marzban marzban cli admin create
+
+# ================================================================
+# TOOLS
+# ================================================================
+
+test-connection:
+	@bash $(SCRIPTS)/test-connection.sh
+
+backup:
+	@bash $(SCRIPTS)/backup.sh
+
+restore:
+ifdef FILE
+	@bash $(SCRIPTS)/restore.sh $(FILE)
+else
+	@bash $(SCRIPTS)/restore.sh
+endif
 
 # ================================================================
 # CLEANUP

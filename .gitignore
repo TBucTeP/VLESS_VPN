@@ -18,6 +18,9 @@ __pycache__/
 *.swo
 .DS_Store
 
+# Backups
+backup_*.tar.gz
+
 # Temp
 *.tmp
 *.bak

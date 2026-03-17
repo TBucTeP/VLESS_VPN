@@ -30,7 +30,7 @@ apt-get update -y
 
 # Base packages
 echo "Installing base packages..."
-apt-get install -y make jq openssl unzip curl ca-certificates gnupg lsb-release
+apt-get install -y make jq openssl unzip curl ca-certificates gnupg lsb-release qrencode
 
 # Docker
 if ! command -v docker &>/dev/null; then
