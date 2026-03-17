@@ -1,155 +1,171 @@
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║            🔐 VLESS/REALITY VPN - Docker Deployment              ║
-# ║                                                                  ║
-# ║   git clone → make install → готовые ссылки!                     ║
-# ╚══════════════════════════════════════════════════════════════════╝
-
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-# Цвета
-C_RED    := \033[0;31m
-C_GREEN  := \033[0;32m
-C_YELLOW := \033[1;33m
-C_BLUE   := \033[0;34m
-C_CYAN   := \033[0;36m
-C_NC     := \033[0m
-
-SCRIPTS := scripts
 COMPOSE := docker compose
+SCRIPTS := scripts
 
-.PHONY: help setup install install-deps check-root init up down restart logs status diagnostics \
-        add remove list rotate-keys change-sni change-sid clean
+# Detect mode: marzban if MARZBAN=1 or docker-compose has marzban image
+MODE := standalone
+ifneq ($(MARZBAN),)
+  MODE := marzban
+endif
 
-# ════════════════════════════════════════════════════════════════════
+.PHONY: help setup install install-deps check-deps check-root env-file \
+        init up down restart logs status diagnostics \
+        add remove list rotate-keys change-sni change-sid gen-keys admin clean
+
+# ================================================================
 # HELP
-# ════════════════════════════════════════════════════════════════════
+# ================================================================
 help:
-	@echo -e "$(C_BLUE)╔══════════════════════════════════════════════════════════════╗$(C_NC)"
-	@echo -e "$(C_BLUE)║       🔐 VLESS/REALITY VPN Server - Docker                   ║$(C_NC)"
-	@echo -e "$(C_BLUE)╚══════════════════════════════════════════════════════════════╝$(C_NC)"
 	@echo ""
-	@echo -e "$(C_GREEN)🚀 Быстрый старт:$(C_NC)"
-	@echo "   sudo make setup   - ВСЁ В ОДНУ КОМАНДУ (зависимости + VPN)"
-	@echo "   make install-deps - Установить зависимости (требует sudo)"
-	@echo "   make install      - Установка VPN (init + up + ссылки)"
+	@echo "  VLESS Reality VPN"
+	@echo "  ================="
 	@echo ""
-	@echo -e "$(C_YELLOW)📦 Команды:$(C_NC)"
-	@echo "   make init        - Генерация конфига и ключей"
-	@echo "   make up          - Запустить контейнер"
-	@echo "   make down        - Остановить контейнер"
-	@echo "   make restart     - Перезапустить"
-	@echo "   make logs        - Логи Xray"
-	@echo "   make status      - Статус"
-	@echo "   make diagnostics - Полная диагностика"
+	@echo "  Standalone (default):"
+	@echo "    sudo make setup             All-in-one (deps + config + start)"
+	@echo "    make install                Generate config + start Xray"
+	@echo "    make install-deps           Install Docker, jq, openssl, ufw (sudo)"
 	@echo ""
-	@echo -e "$(C_CYAN)👥 Клиенты:$(C_NC)"
-	@echo "   make add         - Добавить клиента"
-	@echo "   make remove UUID=<uuid> - Удалить клиента"
-	@echo "   make list        - Список всех клиентов с ссылками"
+	@echo "  Marzban (web panel):"
+	@echo "    sudo make setup MARZBAN=1   All-in-one with Marzban panel"
+	@echo "    make install MARZBAN=1      Start with Marzban panel"
+	@echo "    make admin MARZBAN=1        Create Marzban admin user"
 	@echo ""
-	@echo -e "$(C_CYAN)🔐 Безопасность:$(C_NC)"
-	@echo "   make rotate-keys - Ротация ключей REALITY"
-	@echo "   make change-sni SNI=<domain> - Сменить SNI"
-	@echo "   make change-sid  - Сменить ShortID"
+	@echo "  Docker:"
+	@echo "    make up                     Start container"
+	@echo "    make down                   Stop container"
+	@echo "    make restart                Restart container"
+	@echo "    make logs                   Show logs"
+	@echo "    make status                 Container + port status"
+	@echo "    make diagnostics            Full diagnostics (standalone)"
 	@echo ""
-	@echo -e "$(C_RED)⚠️  Опасные:$(C_NC)"
-	@echo "   make clean       - Удалить всё (контейнер + конфиги)"
+	@echo "  Clients (standalone only):"
+	@echo "    make list                   Show all clients with links"
+	@echo "    make add                    Add a client"
+	@echo "    make remove UUID=<uuid>     Remove a client"
+	@echo ""
+	@echo "  Security (standalone only):"
+	@echo "    make rotate-keys            Rotate Reality keys"
+	@echo "    make change-sni SNI=<domain>"
+	@echo "    make change-sid             Change ShortID"
+	@echo ""
+	@echo "  Danger:"
+	@echo "    make clean                  Remove container + all data"
 	@echo ""
 
-# ════════════════════════════════════════════════════════════════════
-# MAIN COMMANDS
-# ════════════════════════════════════════════════════════════════════
+# ================================================================
+# CHECKS
+# ================================================================
+check-deps:
+	@command -v docker >/dev/null 2>&1 || { echo "Docker not installed. Run: sudo make install-deps"; exit 1; }
+	@command -v jq >/dev/null 2>&1 || { echo "jq not installed. Run: sudo make install-deps"; exit 1; }
+	@docker info >/dev/null 2>&1 || { echo "Docker daemon not running"; exit 1; }
 
-# Всё в одну команду (требует sudo)
+check-root:
+	@if [ "$$(id -u)" -ne 0 ]; then echo "Requires root. Run with sudo."; exit 1; fi
+
+install-deps: check-root
+	@bash $(SCRIPTS)/install-deps.sh
+
+env-file:
+	@if [ ! -f .env ]; then cp .env.example .env; echo "Created .env from .env.example"; fi
+
+# ================================================================
+# SETUP / INSTALL
+# ================================================================
 setup: check-root
+ifeq ($(MODE),marzban)
+	@bash $(SCRIPTS)/install-deps.sh
+	@$(MAKE) --no-print-directory install MARZBAN=1
+else
 	@bash $(SCRIPTS)/00-install-dependencies.sh
 	@$(MAKE) --no-print-directory install
+endif
 
-install: check-deps init up
+install: check-deps env-file
+ifeq ($(MODE),marzban)
+	@$(COMPOSE) -f docker-compose.marzban.yml up -d
+	@sleep 3
 	@echo ""
+	@echo "  Marzban is running!"
+	@echo "  Panel: http://$$(curl -fsSL -4 --connect-timeout 3 ifconfig.co 2>/dev/null || echo '<SERVER_IP>'):8000/dashboard/"
+	@echo "  Login with credentials from .env (or: make admin MARZBAN=1)"
+	@echo ""
+else
+	@bash $(SCRIPTS)/generate-config.sh
+	@$(COMPOSE) up -d
 	@sleep 2
 	@$(MAKE) --no-print-directory list
 	@echo ""
-	@echo -e "$(C_GREEN)╔══════════════════════════════════════════════════════════════╗$(C_NC)"
-	@echo -e "$(C_GREEN)║              ✅ УСТАНОВКА ЗАВЕРШЕНА!                         ║$(C_NC)"
-	@echo -e "$(C_GREEN)╚══════════════════════════════════════════════════════════════╝$(C_NC)"
+	@echo "  Standalone VLESS Reality is running!"
+	@echo "  Client links saved to: output/clients.txt"
 	@echo ""
-	@echo -e "$(C_CYAN)📄 Ссылки сохранены в: output/clients.txt$(C_NC)"
-	@echo -e "$(C_CYAN)📋 Показать ссылки:    make list$(C_NC)"
-	@echo ""
+endif
 
-check-deps:
-	@command -v docker >/dev/null 2>&1 || { \
-		echo -e "$(C_RED)❌ Docker не установлен$(C_NC)"; \
-		echo -e "$(C_YELLOW)💡 Установи зависимости: bash scripts/00-install-dependencies.sh$(C_NC)"; \
-		exit 1; \
-	}
-	@command -v jq >/dev/null 2>&1 || { \
-		echo -e "$(C_RED)❌ jq не установлен$(C_NC)"; \
-		echo -e "$(C_YELLOW)💡 Установи зависимости: bash scripts/00-install-dependencies.sh$(C_NC)"; \
-		exit 1; \
-	}
-	@docker info >/dev/null 2>&1 || { echo -e "$(C_RED)❌ Docker daemon не запущен$(C_NC)"; exit 1; }
-
-check-root:
-	@if [ "$$(id -u)" -ne 0 ]; then \
-		echo -e "$(C_RED)❌ Требуются права root$(C_NC)"; \
-		echo -e "$(C_YELLOW)💡 Запусти: sudo make install-deps$(C_NC)"; \
-		exit 1; \
-	fi
-
-install-deps: check-root
-	@bash $(SCRIPTS)/00-install-dependencies.sh
-
+# ================================================================
+# STANDALONE: config generation
+# ================================================================
 init: env-file
-	@echo -e "$(C_BLUE)🔧 Генерация конфига...$(C_NC)"
 	@bash $(SCRIPTS)/generate-config.sh
 
-env-file:
-	@if [ ! -f .env ]; then cp .env.example .env; echo -e "$(C_YELLOW)📝 Создан .env из .env.example$(C_NC)"; fi
-
-# ════════════════════════════════════════════════════════════════════
+# ================================================================
 # DOCKER
-# ════════════════════════════════════════════════════════════════════
+# ================================================================
 up:
-	@echo -e "$(C_BLUE)🚀 Запуск Xray...$(C_NC)"
+ifeq ($(MODE),marzban)
+	@$(COMPOSE) -f docker-compose.marzban.yml up -d
+else
 	@$(COMPOSE) up -d
-	@echo -e "$(C_GREEN)✅ Xray запущен$(C_NC)"
+endif
+	@echo "Started"
 
 down:
-	@echo -e "$(C_YELLOW)⏹️  Остановка Xray...$(C_NC)"
+ifeq ($(MODE),marzban)
+	@$(COMPOSE) -f docker-compose.marzban.yml down
+else
 	@$(COMPOSE) down
-	@echo -e "$(C_GREEN)✅ Остановлен$(C_NC)"
+endif
+	@echo "Stopped"
 
 restart:
-	@echo -e "$(C_YELLOW)🔄 Перезапуск Xray...$(C_NC)"
+ifeq ($(MODE),marzban)
+	@$(COMPOSE) -f docker-compose.marzban.yml restart
+else
 	@$(COMPOSE) restart
-	@echo -e "$(C_GREEN)✅ Перезапущен$(C_NC)"
+endif
+	@echo "Restarted"
 
 logs:
+ifeq ($(MODE),marzban)
+	@$(COMPOSE) -f docker-compose.marzban.yml logs -f --tail=100
+else
 	@$(COMPOSE) logs -f --tail=100
+endif
 
 status:
-	@echo -e "$(C_BLUE)📊 Статус:$(C_NC)"
-	@echo ""
+ifeq ($(MODE),marzban)
+	@$(COMPOSE) -f docker-compose.marzban.yml ps
+else
 	@$(COMPOSE) ps
+endif
 	@echo ""
-	@echo -e "$(C_YELLOW)Порты:$(C_NC)"
-	@ss -ltnp 2>/dev/null | grep -E ':(2053|8443|443)\s' || netstat -tlnp 2>/dev/null | grep -E ':(2053|8443|443)\s' || echo "  Порты не найдены"
+	@ss -ltnp 2>/dev/null | grep -E ':(443|2053|8443|8000)\s' || \
+		netstat -tlnp 2>/dev/null | grep -E ':(443|2053|8443|8000)\s' || \
+		echo "No listening ports found"
 
 diagnostics:
 	@bash $(SCRIPTS)/diagnostics.sh
 
-# ════════════════════════════════════════════════════════════════════
-# CLIENTS
-# ════════════════════════════════════════════════════════════════════
+# ================================================================
+# STANDALONE: client management
+# ================================================================
 add:
 	@bash $(SCRIPTS)/add-client.sh
 
 remove:
 ifndef UUID
-	@echo -e "$(C_RED)❌ Укажи UUID: make remove UUID=<uuid>$(C_NC)"
+	@echo "Specify UUID: make remove UUID=<uuid>"
 	@exit 1
 else
 	@bash $(SCRIPTS)/remove-client.sh $(UUID)
@@ -158,15 +174,15 @@ endif
 list:
 	@bash $(SCRIPTS)/list-clients.sh
 
-# ════════════════════════════════════════════════════════════════════
-# SECURITY
-# ════════════════════════════════════════════════════════════════════
+# ================================================================
+# STANDALONE: security
+# ================================================================
 rotate-keys:
 	@bash $(SCRIPTS)/rotate-keys.sh
 
 change-sni:
 ifndef SNI
-	@echo -e "$(C_RED)❌ Укажи SNI: make change-sni SNI=login.microsoftonline.com$(C_NC)"
+	@echo "Specify SNI: make change-sni SNI=<domain>"
 	@exit 1
 else
 	@bash $(SCRIPTS)/change-sni.sh $(SNI)
@@ -175,12 +191,19 @@ endif
 change-sid:
 	@bash $(SCRIPTS)/change-sid.sh
 
-# ════════════════════════════════════════════════════════════════════
+# ================================================================
+# MARZBAN: admin
+# ================================================================
+admin:
+	@docker exec -it marzban marzban cli admin create
+
+# ================================================================
 # CLEANUP
-# ════════════════════════════════════════════════════════════════════
+# ================================================================
 clean:
-	@echo -e "$(C_RED)⚠️  Это удалит контейнер и все конфиги!$(C_NC)"
-	@read -p "Продолжить? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
+	@echo "This will remove the container and all generated data!"
+	@read -p "Continue? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
 	@$(COMPOSE) down -v 2>/dev/null || true
+	@$(COMPOSE) -f docker-compose.marzban.yml down -v 2>/dev/null || true
 	@rm -rf config output logs
-	@echo -e "$(C_GREEN)✅ Очищено$(C_NC)"
+	@echo "Cleaned"

@@ -8,10 +8,8 @@ services:
     volumes:
       - ./config:/etc/xray:ro
     environment:
-      - TZ=Europe/Paris
+      - TZ=UTC
     cap_add:
       - NET_ADMIN
       - NET_BIND_SERVICE
-    security_opt:
-      - no-new-privileges:false
     command: ["run", "-c", "/etc/xray/config.json"]

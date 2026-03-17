@@ -1,7 +1,7 @@
 # Environment
 .env
 
-# Generated configs (содержат приватные ключи)
+# Generated data
 config/
 output/
 logs/
